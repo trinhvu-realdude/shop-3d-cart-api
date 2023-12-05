@@ -13,6 +13,8 @@ app.disable("x-powered-by");
 
 app.use(morgan("common"));
 
+app.get("/", (req, res) => res.send("Hello World!"));
+
 app.get("/api/categories", async (req, res) => {
     const apiUrl =
         "https://apirest.3dcart.com/3dCartWebAPI/v2/Categories?limit=9000000&offset=0";
