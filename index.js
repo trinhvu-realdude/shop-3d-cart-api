@@ -41,46 +41,46 @@ app.get("/api/categories", async (req, res) => {
             findLeafCategories(subCategory, leafCategories, categories);
         }
 
-        const validCategoriesList = new Set();
+        // const validCategoriesList = new Set();
 
-        let i = 0;
+        // let i = 0;
 
-        while (true) {
-            try {
-                const products = await getProductsByOffset(i, bearerToken);
+        // while (true) {
+        //     try {
+        //         const products = await getProductsByOffset(i, bearerToken);
 
-                products.forEach((product) => {
-                    const categoryList = product.CategoryList;
+        //         products.forEach((product) => {
+        //             const categoryList = product.CategoryList;
 
-                    categoryList.forEach((category) => {
-                        validCategoriesList.add(category.CategoryID);
-                    });
-                });
+        //             categoryList.forEach((category) => {
+        //                 validCategoriesList.add(category.CategoryID);
+        //             });
+        //         });
 
-                i += 200;
-            } catch (error) {
-                if (
-                    error.response &&
-                    Array.isArray(error.response.data) &&
-                    error.response.data.length > 0 &&
-                    error.response.data[0].Status === "404"
-                ) {
-                    // Exit the loop when 404 error occurs
-                    console.error("Error :", error.response.data[0].Message);
-                    break;
-                } else {
-                    // Handle other errors if needed
-                    console.error("An error occurred:", error);
-                    break; // You might want to break in other error cases too
-                }
-            }
-        }
+        //         i += 200;
+        //     } catch (error) {
+        //         if (
+        //             error.response &&
+        //             Array.isArray(error.response.data) &&
+        //             error.response.data.length > 0 &&
+        //             error.response.data[0].Status === "404"
+        //         ) {
+        //             // Exit the loop when 404 error occurs
+        //             console.error("Error :", error.response.data[0].Message);
+        //             break;
+        //         } else {
+        //             // Handle other errors if needed
+        //             console.error("An error occurred:", error);
+        //             break; // You might want to break in other error cases too
+        //         }
+        //     }
+        // }
 
-        const emptyCategoryIds = Array.from(leafCategories).filter(
-            (categoryId) => !validCategoriesList.has(categoryId)
-        );
+        // const emptyCategoryIds = Array.from(leafCategories).filter(
+        //     (categoryId) => !validCategoriesList.has(categoryId)
+        // );
 
-        const finalResult = Array.from(emptyCategoryIds)
+        const finalResult = Array.from(leafCategories)
             .map((categoryId) => {
                 const category = subCategories.find(
                     (category) => category.CategoryID === categoryId
