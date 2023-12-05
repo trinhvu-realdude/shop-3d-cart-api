@@ -136,12 +136,32 @@ async function getProductsByOffset(offset, bearerToken) {
         });
 
         const products = response.data;
-        return products;
+        res.json(products);
     } catch (error) {
         console.error("Axios error:", error);
         res.status(500).send("Internal Server Error");
     }
 }
+
+app.get("/api/products/:offset", async(req, res) => {
+    const bearerToken = req.headers.authorization;
+    const offset = req.params["offset"];
+
+    try {
+        const response = await axios.get(`https://apirest.3dcart.com/3dCartWebAPI/v2/Products?limit=200&offset=${offset}`, {
+            headers: {
+                Authorization: `${bearerToken}`,
+                "Content-Type": "application/json",
+            },
+        });
+
+        const result = response.data;
+        res.send(result);
+    } catch (error) {
+        console.error("Axios error:", error);
+        res.status(500).send({status: "500", message: "Internal Server Error"});
+    }
+})
 
 app.delete("/api/delete/:categoryId", async (req, res) => {
     const bearerToken = req.headers.authorization;
