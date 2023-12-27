@@ -15,86 +15,83 @@ app.use(morgan("common"));
 
 app.get("/", (req, res) => res.send("Hello World!"));
 
-app.get("/api/categories", async (req, res) => {
-    const apiUrl =
-        "https://apirest.3dcart.com/3dCartWebAPI/v2/Categories?limit=9000000&offset=0";
+app.get("/api/getAllCategories", async (req, res) => {
+    const limit = 10000;
+    let offset = 0;
+    let allCategories = [];
+    let emptyCategories = [];
+
     const bearerToken = req.headers.authorization;
 
     try {
-        const response = await axios.get(apiUrl, {
-            headers: {
-                Authorization: `${bearerToken}`,
-                "Content-Type": "application/json",
-            },
-        });
+        while (true) {
+            const apiResponse = await axios.get(
+                `https://apirest.3dcart.com/3dCartWebAPI/v2/Categories?limit=${limit}&offset=${offset}`,
+                {
+                    headers: {
+                        Authorization: `${bearerToken}`,
+                        "Content-Type": "application/json",
+                    },
+                }
+            );
 
-        const categories = response.data;
+            const categories = apiResponse.data;
 
-        const filteredCategoriesList = cleanCategories(categories);
+            if (categories.length === 0) {
+                break;
+            }
 
-        const subCategories = filteredCategoriesList.filter(
-            (cat) => cat.CategoryParent !== 0
-        );
+            allCategories = allCategories.concat(categories);
 
-        const leafCategories = new Set();
-        for (const subCategory of subCategories) {
-            findLeafCategories(subCategory, leafCategories, categories);
+            offset += limit;
+
+            console.log(`Found ${categories.length} categories`);
         }
 
-        // const validCategoriesList = new Set();
-
-        // let i = 0;
-
-        // while (true) {
-        //     try {
-        //         const products = await getProductsByOffset(i, bearerToken);
-
-        //         products.forEach((product) => {
-        //             const categoryList = product.CategoryList;
-
-        //             categoryList.forEach((category) => {
-        //                 validCategoriesList.add(category.CategoryID);
-        //             });
-        //         });
-
-        //         i += 200;
-        //     } catch (error) {
-        //         if (
-        //             error.response &&
-        //             Array.isArray(error.response.data) &&
-        //             error.response.data.length > 0 &&
-        //             error.response.data[0].Status === "404"
-        //         ) {
-        //             // Exit the loop when 404 error occurs
-        //             console.error("Error :", error.response.data[0].Message);
-        //             break;
-        //         } else {
-        //             // Handle other errors if needed
-        //             console.error("An error occurred:", error);
-        //             break; // You might want to break in other error cases too
-        //         }
-        //     }
-        // }
-
-        // const emptyCategoryIds = Array.from(leafCategories).filter(
-        //     (categoryId) => !validCategoriesList.has(categoryId)
-        // );
-
-        const finalResult = Array.from(leafCategories)
-            .map((categoryId) => {
-                const category = subCategories.find(
-                    (category) => category.CategoryID === categoryId
-                );
-                return category;
-            })
-            .filter((cat) => cat !== undefined);
-
-        res.json(finalResult);
+        res.json(null);
     } catch (error) {
-        console.error("Axios error:", error);
-        res.status(500).send("Internal Server Error");
+        // Handle errors, e.g., log the error and send an error response
+        if (error.response.status === 404) {
+
+            const subCategories = cleanCategories(allCategories).filter(
+                (cat) => cat.CategoryParent !== 0
+            );
+    
+            const leafCategories = new Set();
+            for (const subCategory of subCategories) {
+                findLeafCategories(subCategory, leafCategories, allCategories);
+            }
+    
+            emptyCategories = Array.from(leafCategories)
+                .map((categoryId) => {
+                    const category = subCategories.find(
+                        (category) => category.CategoryID === categoryId
+                    );
+                    return category;
+                })
+                .filter((cat) => cat !== undefined);
+    
+            console.log(`Found ${emptyCategories.length} empty categories`);
+
+            res.json(emptyCategories);
+        } else {
+            console.error("Error fetching categories:", error.code);
+            res.status(500).json({ error: "Internal Server Error" });
+        }
     }
 });
+
+function cleanCategories(categories) {
+    const counts = {};
+    categories.forEach((category) => {
+        counts[category.CustomFileName] =
+            (counts[category.CustomFileName] || 0) + 1;
+    });
+
+    return categories.filter(
+        (category) => counts[category.CustomFileName] === 1
+    );
+}
 
 function findLeafCategories(subCategory, leafCategories, categories) {
     const subList = categories.filter(
@@ -110,65 +107,12 @@ function findLeafCategories(subCategory, leafCategories, categories) {
     }
 }
 
-function cleanCategories(categories) {
-    const counts = {};
-    categories.forEach((category) => {
-        counts[category.CustomFileName] =
-            (counts[category.CustomFileName] || 0) + 1;
-    });
-
-    return categories.filter(
-        (category) => counts[category.CustomFileName] === 1
-    );
-}
-
-async function getProductsByOffset(offset, bearerToken) {
-    const apiUrl = `https://apirest.3dcart.com/3dCartWebAPI/v2/Products?limit=200&offset=${offset}`;
-    
-    console.log(`Fetching /3dCartWebAPI/v2/Products?limit=200&offset=${offset}`);
-
-    try {
-        const response = await axios.get(apiUrl, {
-            headers: {
-                Authorization: `${bearerToken}`,
-                "Content-Type": "application/json",
-            },
-        });
-
-        const products = response.data;
-        res.json(products);
-    } catch (error) {
-        console.error("Axios error:", error);
-        res.status(500).send("Internal Server Error");
-    }
-}
-
-app.get("/api/products/:offset", async(req, res) => {
-    const bearerToken = req.headers.authorization;
-    const offset = req.params["offset"];
-
-    try {
-        const response = await axios.get(`https://apirest.3dcart.com/3dCartWebAPI/v2/Products?limit=200&offset=${offset}`, {
-            headers: {
-                Authorization: `${bearerToken}`,
-                "Content-Type": "application/json",
-            },
-        });
-
-        const result = response.data;
-        res.send(result);
-    } catch (error) {
-        console.error("Axios error:", error);
-        res.status(500).send({status: "500", message: "Internal Server Error"});
-    }
-})
-
-app.delete("/api/delete/:categoryId", async (req, res) => {
+app.get("/api/checkProductsInside/:categoryId", async (req, res) => {
     const bearerToken = req.headers.authorization;
     const categoryId = req.params["categoryId"];
 
     try {
-        const response = await axios.delete(`${apiUrl}/${categoryId}`, {
+        const response = await axios.get(`https://apirest.3dcart.com/3dCartWebAPI/v2/Categories/${categoryId}/Products`, {
             headers: {
                 Authorization: `${bearerToken}`,
                 "Content-Type": "application/json",
@@ -176,7 +120,8 @@ app.delete("/api/delete/:categoryId", async (req, res) => {
         });
 
         const result = response.data;
-        res.send(result);
+        console.log(`Found ${result.length} products in category ${categoryId}`);
+        res.json(result.length);
     } catch (error) {
         console.error("Axios error:", error);
         res.status(500).send("Internal Server Error");
