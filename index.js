@@ -52,16 +52,15 @@ app.get("/api/getAllCategories", async (req, res) => {
     } catch (error) {
         // Handle errors, e.g., log the error and send an error response
         if (error.response.status === 404) {
-
             const subCategories = cleanCategories(allCategories).filter(
                 (cat) => cat.CategoryParent !== 0
             );
-    
+
             const leafCategories = new Set();
             for (const subCategory of subCategories) {
                 findLeafCategories(subCategory, leafCategories, allCategories);
             }
-    
+
             emptyCategories = Array.from(leafCategories)
                 .map((categoryId) => {
                     const category = subCategories.find(
@@ -69,8 +68,13 @@ app.get("/api/getAllCategories", async (req, res) => {
                     );
                     return category;
                 })
-                .filter((cat) => cat !== undefined);
-    
+                .filter((cat) => cat !== undefined)
+                .map(({ CategoryID, CategoryName, CustomFileName }) => ({
+                    CategoryID,
+                    CategoryName,
+                    CustomFileName,
+                }));
+
             console.log(`Found ${emptyCategories.length} empty categories`);
 
             res.json(emptyCategories);
@@ -112,20 +116,70 @@ app.get("/api/checkProductsInside/:categoryId", async (req, res) => {
     const categoryId = req.params["categoryId"];
 
     try {
-        const response = await axios.get(`https://apirest.3dcart.com/3dCartWebAPI/v2/Categories/${categoryId}/Products`, {
-            headers: {
-                Authorization: `${bearerToken}`,
-                "Content-Type": "application/json",
-            },
-        });
+        const response = await axios.get(
+            `https://apirest.3dcart.com/3dCartWebAPI/v2/Categories/${categoryId}/Products`,
+            {
+                headers: {
+                    Authorization: `${bearerToken}`,
+                    "Content-Type": "application/json",
+                },
+            }
+        );
 
         const result = response.data;
-        console.log(`Found ${result.length} products in category ${categoryId}`);
+        console.log(
+            `Found ${result.length} products in category ${categoryId}`
+        );
         res.json(result.length);
     } catch (error) {
         console.error("Axios error:", error);
         res.status(500).send("Internal Server Error");
     }
+});
+
+app.post("/api/checkAll", async (req, res) => {
+    const bearerToken = req.headers.authorization;
+    const { data } = req.body;
+
+    const finalResult = [];
+
+    console.log("checkAll ::::");
+    const promises = data.map(async (category) => {
+        const categoryId = category.CategoryID;
+
+        try {
+            const response = await axios.get(
+                `https://apirest.3dcart.com/3dCartWebAPI/v2/Categories/${categoryId}/Products`,
+                {
+                    headers: {
+                        Authorization: `${bearerToken}`,
+                        "Content-Type": "application/json",
+                    },
+                }
+            );
+
+            const result = response.data;
+            console.log(
+                `Found ${result.length} products in category ${categoryId}`
+            );
+
+            // if (result.length === 0) {
+            //     emptyCategories.push(category);
+            // }
+            category = {
+                CategoryID: category.CategoryID,
+                NumberOfProducts: result.length,
+            };
+            finalResult.push(category);
+        } catch (error) {
+            console.error("Axios error:", error);
+            res.status(500).send("Internal Server Error");
+        }
+    });
+
+    await Promise.all(promises);
+
+    res.json(finalResult);
 });
 
 app.listen(port, () => {
